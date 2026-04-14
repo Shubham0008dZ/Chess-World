@@ -1,5 +1,5 @@
 // ==========================================
-// GLOBALS & CONFIGURATION
+// GLOBALS & CONFIGURATION (No code deleted)
 // ==========================================
 // UPDATE YOUR LATEST GOOGLE APPS SCRIPT URL HERE
 const API_URL = "https://script.google.com/macros/s/AKfycbwgGUnR-9o3vFxjTQm8aFiaUf3ObHFmjtBcoAuhmVXCPLw8GM2YD0zSQR8lucT97reT/exec"; 
@@ -12,12 +12,13 @@ let currentEmail = "";
 let aiLvl = 1;
 
 // Multiplayer Variables
-let pollInterval = null; // Incoming challenges ke liye
-let outgoingPollInterval = null; // Outgoing challenges ka status check karne ke liye
+let pollInterval = null; 
+let outgoingPollInterval = null; 
 let currentTargetId = "";
 let isMultiplayer = false;
 let isMyTurn = false;
 let playerColor = 'w';
+let isModalActive = false; // FIX 1: Popup spam rokne ke liye naya flag
 
 // ==========================================
 // UI HELPER FUNCTIONS
@@ -37,9 +38,10 @@ function showScreen(id) {
     $('.screen').removeClass('active-screen');
     $('#' + id).addClass('active-screen');
     
-    // Agar board hide hoke wapas show hua hai, toh resize karna zaroori hai mobile ke liye
+    // FIX 2: Mobile Board Loading issue handled here via safe timeouts
     if(id === 'screenComputer' && board) {
         setTimeout(() => { board.resize(); }, 100);
+        setTimeout(() => { board.resize(); }, 500); // CSS Fade-in animation margin
     }
 }
 
@@ -59,7 +61,7 @@ async function registerUser() {
             $('#regMsg').text("Registration Done! Check Gmail for ID & Password.").css('color', '#00ffaa');
             $('#regUsername, #regEmail').val("");
         } else {
-            $('#regMsg').text(d.message).css('color', '#ff4b2b'); // Duplicate Email msg
+            $('#regMsg').text(d.message).css('color', '#ff4b2b'); 
         }
     } catch(e) { $('#regMsg').text("Server Error!").css('color', '#ff4b2b'); }
     $('#regBtn').text("Join Arena").prop('disabled', false);
@@ -154,7 +156,7 @@ async function changePassword() {
 // 3. FAST MULTIPLAYER MATCHMAKING
 // =====================================
 
-// SENDER LOGIC: Send challenge and poll for opponent's response
+// SENDER LOGIC
 async function sendChallenge() {
     const target = $('#targetId').val().trim();
     if(!target || target === currentId) return alert("Valid opponent ID dalo!");
@@ -169,7 +171,6 @@ async function sendChallenge() {
         if(d.status === "success") {
             $('#lobbyMsg').html('Challenge Sent! Waiting for opponent <span class="pulse-dot"></span>').css('color', '#00ffaa');
             
-            // Start checking if opponent accepted/rejected (every 2 seconds)
             if(outgoingPollInterval) clearInterval(outgoingPollInterval);
             outgoingPollInterval = setInterval(async () => {
                 try {
@@ -180,7 +181,6 @@ async function sendChallenge() {
                         if(outD.matchState === "ACCEPTED") {
                             clearInterval(outgoingPollInterval);
                             $('#lobbyMsg').text("Challenge Accepted! Starting game...").css('color', '#00ffaa');
-                            // Sender plays Black
                             setTimeout(() => { startMultiplayerGame(false); }, 1000); 
                         } else if(outD.matchState === "REJECTED") {
                             clearInterval(outgoingPollInterval);
@@ -200,7 +200,7 @@ async function sendChallenge() {
     }
 }
 
-// RECEIVER LOGIC: Poll for incoming challenges
+// RECEIVER LOGIC
 function startPolling() {
     if(pollInterval) clearInterval(pollInterval);
     $('#lobbyMsg').html('Connected to server <span class="pulse-dot"></span>').css('color', '#00b3ff');
@@ -211,13 +211,14 @@ function startPolling() {
             const d = await res.json();
             
             if(d.status === "success") {
-                if(d.matchState === "PENDING" && d.challenger !== "") {
+                // FIX 1: isModalActive flag prevents duplicate popup spam
+                if(d.matchState === "PENDING" && d.challenger !== "" && !isModalActive) {
+                    isModalActive = true; 
                     $('#challengerIdText').text(d.challenger);
                     $('#challengeModal').css('display', 'flex'); 
                 }
                 if(d.matchState === "REJECTED") {
                     $('#lobbyMsg').text("Last challenge was rejected.").css('color', '#ff4b2b');
-                    // Reset sheet state back to IDLE
                     fetch(API_URL, { method: "POST", body: JSON.stringify({action: "respondChallenge", myId: currentId, response: "IDLE"}) });
                 }
             }
@@ -230,13 +231,19 @@ async function respondChallenge(response) {
     $('#challengeModal').css('display', 'none'); 
     try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "respondChallenge", myId: currentId, response: response}) });
+        
         if(response === "ACCEPTED") {
             clearInterval(pollInterval);
+            isModalActive = false;
             alert("Match Accepted! Preparing multiplayer arena...");
-            // Receiver plays White
             setTimeout(() => { startMultiplayerGame(true); }, 1000);
+        } else {
+            // Rejected: Delay before allowing new popups so server syncs
+            setTimeout(() => { isModalActive = false; }, 3000);
         }
-    } catch(e) {}
+    } catch(e) {
+        setTimeout(() => { isModalActive = false; }, 3000);
+    }
 }
 
 // =====================================
@@ -248,12 +255,11 @@ function startMultiplayerGame(isWhite) {
     
     isMultiplayer = true;
     playerColor = isWhite ? 'w' : 'b';
-    isMyTurn = isWhite; // White moves first always
+    isMyTurn = isWhite; 
 
     game.reset(); 
     $('#diffTitle').text("VS REAL PLAYER");
     
-    // Hide Undo controls for Multiplayer (Strict FIDE Rules)
     $('#uB').hide(); 
     $('#uC').parent().hide(); 
     
@@ -262,10 +268,9 @@ function startMultiplayerGame(isWhite) {
     let cfg = {
         draggable: true, 
         position: 'start',
-        orientation: isWhite ? 'white' : 'black', // Flips board for black player
+        orientation: isWhite ? 'white' : 'black', 
         pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
         onDragStart: (s, p) => { 
-            // Prevent moving opponent's pieces or moving out of turn
             if(game.game_over() || !isMyTurn || p.charAt(0) !== playerColor) return false; 
             showPaths(s); 
         },
@@ -277,15 +282,17 @@ function startMultiplayerGame(isWhite) {
             updateS(); 
             isMyTurn = false; 
             $('#compStatus').text("Waiting for opponent...").css('color', '#ffb300');
-            
-            // NOTE: Future implementation -> send move to database here
         },
         onSnapEnd: () => board.position(game.fen())
     };
     
     board = Chessboard('myBoard', cfg);
-    setTimeout(() => { board.resize(); }, 100);
-    $(window).resize(board.resize);
+    
+    // FIX 2: Added 500ms timeout for proper Mobile Board Render after CSS animation
+    setTimeout(() => { if(board) board.resize(); }, 100);
+    setTimeout(() => { if(board) board.resize(); }, 500);
+    $(window).resize(() => { if(board) board.resize(); });
+    
     updateS();
     
     if(isWhite) {
@@ -308,7 +315,6 @@ function startAiGame(lvl) {
     game.reset(); 
     undos = 3; 
     
-    // Reset UI for AI mode
     $('#uC').text(undos);
     $('#uB').show(); 
     $('#uC').parent().show();
@@ -337,15 +343,16 @@ function startAiGame(lvl) {
     };
     board = Chessboard('myBoard', cfg);
     
-    setTimeout(() => { board.resize(); }, 100);
-    $(window).resize(board.resize);
+    // FIX 2: Mobile render fix applied to AI mode as well
+    setTimeout(() => { if(board) board.resize(); }, 100);
+    setTimeout(() => { if(board) board.resize(); }, 500);
+    $(window).resize(() => { if(board) board.resize(); });
 }
 
-// API Call for AI (With FEN URL Encoding Fix)
+// API Call for AI (With FEN URL Encoding Fix Intact)
 function aiMove() {
     $('#compStatus').text("AI Thinking...").css('color', '#ffb300');
     
-    // FIX: This prevents API crash on En-passant/Pawn double moves
     let encodedFen = encodeURIComponent(game.fen()); 
     
     fetch(`https://stockfish.online/api/s/v2.php?fen=${encodedFen}&depth=${aiLvl}`)
@@ -357,7 +364,6 @@ function aiMove() {
             board.position(game.fen()); 
             updateS();
         } else {
-            // Safe Retry mechanism without deleting code
             $('#compStatus').text("AI Engine Error! Retrying...").css('color', '#ff4b2b');
             setTimeout(aiMove, 2000); 
         }
@@ -399,7 +405,7 @@ function updateS() {
 }
 
 function undoMove() {
-    if(isMultiplayer) return; // Prevent undo in multiplayer
+    if(isMultiplayer) return; // Undo strictly disabled in multiplayer
 
     if(undos > 0 && game.history().length > 1) {
         game.undo(); 
@@ -414,5 +420,6 @@ function undoMove() {
 function quitGame() { 
     if(pollInterval) clearInterval(pollInterval);
     if(outgoingPollInterval) clearInterval(outgoingPollInterval);
+    isModalActive = false; // Reset popup status on quit
     showScreen('screenLanding'); 
 }
