@@ -1,7 +1,7 @@
 // ==========================================
 // GLOBALS & CONFIGURATION
 // ==========================================
-const API_URL = "AAPKI_NAYI_NEW_DEPLOYMENT_WALI_API_URL_YAHAN_AAYEGI"; 
+const API_URL = "https://script.google.com/macros/s/AKfycbwgGUnR-9o3vFxjTQm8aFiaUf3ObHFmjtBcoAuhmVXCPLw8GM2YD0zSQR8lucT97reT/exec"; 
 
 let board = null;
 let game = new Chess(); 
