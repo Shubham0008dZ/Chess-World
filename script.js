@@ -1,10 +1,9 @@
-// --- UPDATE YOUR LATEST API URL HERE ---
+// AApki API URL waise hi rakhi hai
 const API_URL = "https://script.google.com/macros/s/AKfycbwgGUnR-9o3vFxjTQm8aFiaUf3ObHFmjtBcoAuhmVXCPLw8GM2YD0zSQR8lucT97reT/exec"; 
 
 let board = null, game = new Chess(), undos = 3, currentId = "", aiLvl = 1, currentEmail = "";
 let pollInterval = null;
 
-// Password Visibility Logic
 function toggleVisibility(inputId, icon) {
     let input = document.getElementById(inputId);
     if (input.type === "password") { input.type = "text"; icon.classList.replace("fa-eye", "fa-eye-slash"); } 
@@ -14,10 +13,15 @@ function toggleVisibility(inputId, icon) {
 function showScreen(id) {
     $('.screen').removeClass('active-screen');
     $('#' + id).addClass('active-screen');
+    
+    // Board needs resize trigger if it was hidden
+    if(id === 'screenComputer' && board) {
+        setTimeout(() => { board.resize(); }, 100);
+    }
 }
 
 // =====================================
-// REGISTRATION & LOGIN
+// REGISTRATION & LOGIN (No Logic Deleted)
 // =====================================
 async function registerUser() {
     const user = $('#regUsername').val().trim();
@@ -32,7 +36,7 @@ async function registerUser() {
             $('#regMsg').text("Done! Check Gmail for ID & Password.").css('color', '#00ffaa');
             $('#regUsername, #regEmail').val("");
         } else {
-            $('#regMsg').text(d.message).css('color', 'red'); // Duplicate Email msg
+            $('#regMsg').text(d.message).css('color', 'red'); 
         }
     } catch(e) { $('#regMsg').text("Server Error!").css('color', 'red'); }
     $('#regBtn').text("Join Arena").prop('disabled', false);
@@ -55,7 +59,7 @@ async function loginUser() {
                 $('#lobbyUsername').text(d.username);
                 $('#lobbyMyId').text(id);
                 showScreen('screenLobby');
-                startPolling(); // Lobby me aate hi notifications check karna shuru
+                startPolling(); // LIVE CONNECTION STARTS HERE
             }
         } else {
             $('#loginMsg').text(d.message).css('color', 'red');
@@ -65,7 +69,7 @@ async function loginUser() {
 }
 
 // =====================================
-// FORGOT PASSWORD FLOW
+// FORGOT / CHANGE PASSWORD (No Logic Deleted)
 // =====================================
 async function sendOtp() {
     const mail = $('#forgotEmail').val().trim();
@@ -124,28 +128,33 @@ async function changePassword() {
 }
 
 // =====================================
-// MULTIPLAYER MATCHMAKING (Search & Poll)
+// FAST MULTIPLAYER MATCHMAKING (Updated Speed)
 // =====================================
 async function sendChallenge() {
     const target = $('#targetId').val().trim();
     if(!target || target === currentId) return alert("Valid opponent ID dalo!");
     
-    $('#challengeBtn').text("Challenging...").prop('disabled', true);
+    $('#challengeBtn').text("Sending...").prop('disabled', true);
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "sendChallenge", targetId: target, myId: currentId}) });
         const d = await res.json();
         if(d.status === "success") {
-            $('#lobbyMsg').text("Challenge sent! Waiting for response...").css('color', '#00ffaa');
+            $('#lobbyMsg').html('Challenge Sent! Waiting for opponent <span class="pulse-dot"></span>').css('color', '#00ffaa');
         } else {
             $('#lobbyMsg').text(d.message).css('color', 'red');
         }
     } catch(e) {}
-    $('#challengeBtn').text("⚔️ Challenge / Play").prop('disabled', false);
+    $('#challengeBtn').text("⚔️ Challenge Player").prop('disabled', false);
 }
 
-// Background checking for incoming challenges
+// FIX 3: FASTER POLLING FOR REAL-TIME MOBILE NOTIFICATION
 function startPolling() {
     if(pollInterval) clearInterval(pollInterval);
+    
+    // Live UI Indicator
+    $('#lobbyMsg').html('Connected to server <span class="pulse-dot"></span>').css('color', '#00b3ff');
+
+    // Poll every 2 seconds instead of 4
     pollInterval = setInterval(async () => {
         try {
             const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "poll", myId: currentId}) });
@@ -154,38 +163,42 @@ function startPolling() {
             if(d.status === "success") {
                 if(d.matchState === "PENDING" && d.challenger !== "") {
                     $('#challengerIdText').text(d.challenger);
-                    $('#challengeModal').css('display', 'flex'); // Show Modal
+                    $('#challengeModal').css('display', 'flex'); // POPUP APPEARS
                 }
                 if(d.matchState === "ACCEPTED") {
-                    clearInterval(pollInterval); // Stop polling when game starts
-                    alert("Match Accepted! Game starting... (Multiplayer board logic will load here)");
-                    // showScreen('screenMultiplayerBoard'); -> Future integration
+                    clearInterval(pollInterval); 
+                    alert("Opponent Accepted! Multiplayer board feature coming soon.");
+                    // Future: Load Multiplayer Board here
                 }
                 if(d.matchState === "REJECTED") {
-                    $('#lobbyMsg').text("Last challenge was rejected!").css('color', 'red');
+                    $('#lobbyMsg').text("Your challenge was rejected by the player.").css('color', '#ff4b2b');
+                    // Reset sheet state back to IDLE so we don't keep getting "REJECTED" message
+                    fetch(API_URL, { method: "POST", body: JSON.stringify({action: "respondChallenge", myId: target, response: "IDLE"}) });
                 }
             }
-        } catch(e) {}
-    }, 4000); // Poll every 4 seconds
+        } catch(e) {
+             console.log("Polling wait...");
+        }
+    }, 2000); // 2 Seconds
 }
 
 async function respondChallenge(response) {
-    $('#challengeModal').css('display', 'none'); // Hide modal
+    $('#challengeModal').css('display', 'none'); // Hide popup
     try {
         await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "respondChallenge", myId: currentId, response: response}) });
         if(response === "ACCEPTED") {
             clearInterval(pollInterval);
-            alert("You accepted the match! Game starting...");
+            alert("Match Accepted! Preparing multiplayer arena...");
         }
     } catch(e) {}
 }
 
 
 // =====================================
-// ORIGINAL AI GAME LOGIC (Untouched/Expanded)
+// AI GAME LOGIC (No Logic Deleted)
 // =====================================
 function startAiGame(lvl) {
-    if(pollInterval) clearInterval(pollInterval); // Stop polling if playing AI
+    if(pollInterval) clearInterval(pollInterval); // Stop polling when playing AI
     aiLvl = lvl === 'PRO' ? 12 : (lvl === 'Expert' ? 5 : 1);
     game.reset(); undos = 3; $('#uC').text(undos);
     $('#diffTitle').text("VS " + lvl + " AI");
@@ -199,6 +212,9 @@ function startAiGame(lvl) {
         onSnapEnd: () => board.position(game.fen())
     };
     board = Chessboard('myBoard', cfg);
+    
+    // Crucial for mobile resize
+    setTimeout(() => { board.resize(); }, 100);
     $(window).resize(board.resize);
 }
 
