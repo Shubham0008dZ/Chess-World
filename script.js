@@ -1,5 +1,5 @@
 // ==========================================
-// GLOBALS & CONFIGURATION (No code deleted)
+// GLOBALS & CONFIGURATION
 // ==========================================
 // UPDATE YOUR LATEST GOOGLE APPS SCRIPT URL HERE
 const API_URL = "https://script.google.com/macros/s/AKfycbwgGUnR-9o3vFxjTQm8aFiaUf3ObHFmjtBcoAuhmVXCPLw8GM2YD0zSQR8lucT97reT/exec"; 
@@ -18,7 +18,7 @@ let currentTargetId = "";
 let isMultiplayer = false;
 let isMyTurn = false;
 let playerColor = 'w';
-let isModalActive = false; // FIX 1: Popup spam rokne ke liye naya flag
+let isModalActive = false; 
 
 // ==========================================
 // UI HELPER FUNCTIONS
@@ -38,10 +38,10 @@ function showScreen(id) {
     $('.screen').removeClass('active-screen');
     $('#' + id).addClass('active-screen');
     
-    // FIX 2: Mobile Board Loading issue handled here via safe timeouts
+    // Agar board hide hoke wapas show hua hai, toh resize karna zaroori hai mobile ke liye
     if(id === 'screenComputer' && board) {
         setTimeout(() => { board.resize(); }, 100);
-        setTimeout(() => { board.resize(); }, 500); // CSS Fade-in animation margin
+        setTimeout(() => { board.resize(); }, 500);
     }
 }
 
@@ -211,7 +211,6 @@ function startPolling() {
             const d = await res.json();
             
             if(d.status === "success") {
-                // FIX 1: isModalActive flag prevents duplicate popup spam
                 if(d.matchState === "PENDING" && d.challenger !== "" && !isModalActive) {
                     isModalActive = true; 
                     $('#challengerIdText').text(d.challenger);
@@ -238,7 +237,6 @@ async function respondChallenge(response) {
             alert("Match Accepted! Preparing multiplayer arena...");
             setTimeout(() => { startMultiplayerGame(true); }, 1000);
         } else {
-            // Rejected: Delay before allowing new popups so server syncs
             setTimeout(() => { isModalActive = false; }, 3000);
         }
     } catch(e) {
@@ -288,7 +286,6 @@ function startMultiplayerGame(isWhite) {
     
     board = Chessboard('myBoard', cfg);
     
-    // FIX 2: Added 500ms timeout for proper Mobile Board Render after CSS animation
     setTimeout(() => { if(board) board.resize(); }, 100);
     setTimeout(() => { if(board) board.resize(); }, 500);
     $(window).resize(() => { if(board) board.resize(); });
@@ -303,7 +300,7 @@ function startMultiplayerGame(isWhite) {
 }
 
 // =====================================
-// 5. AI GAME LOGIC
+// 5. AI GAME LOGIC (Upgraded AI Backend)
 // =====================================
 function startAiGame(lvl) {
     if(pollInterval) clearInterval(pollInterval); 
@@ -343,33 +340,42 @@ function startAiGame(lvl) {
     };
     board = Chessboard('myBoard', cfg);
     
-    // FIX 2: Mobile render fix applied to AI mode as well
     setTimeout(() => { if(board) board.resize(); }, 100);
     setTimeout(() => { if(board) board.resize(); }, 500);
     $(window).resize(() => { if(board) board.resize(); });
 }
 
-// API Call for AI (With FEN URL Encoding Fix Intact)
+// ========================================================
+// UPGRADED AI FUNCTION: Ultra Stable API to fix the bug
+// ========================================================
 function aiMove() {
     $('#compStatus').text("AI Thinking...").css('color', '#ffb300');
     
-    let encodedFen = encodeURIComponent(game.fen()); 
-    
-    fetch(`https://stockfish.online/api/s/v2.php?fen=${encodedFen}&depth=${aiLvl}`)
+    // Naya premium free API use kar rahe hain jo secure POST use karta hai
+    // Isme FEN break hone ki (Pyada 2 kadam) dikkat hamesha ke liye khatam ho jayegi
+    fetch("https://chess-api.com/v1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fen: game.fen(), depth: aiLvl })
+    })
     .then(r => r.json())
     .then(d => {
-        if(d.success && d.bestmove) {
-            let m = d.bestmove.split(' ')[1];
-            game.move({from: m.slice(0,2), to: m.slice(2,4), promotion: m[4]});
+        if(d && d.move) {
+            let m = d.move; // Move jaise "e2e4" format me aati hai
+            let promo = m.length > 4 ? m[4] : 'q';
+            
+            game.move({from: m.slice(0,2), to: m.slice(2,4), promotion: promo});
             board.position(game.fen()); 
             updateS();
         } else {
-            $('#compStatus').text("AI Engine Error! Retrying...").css('color', '#ff4b2b');
-            setTimeout(aiMove, 2000); 
+            console.error("AI API Error:", d);
+            $('#compStatus').text("AI Engine Retry...").css('color', '#ff4b2b');
+            setTimeout(aiMove, 2500); 
         }
     })
     .catch(e => {
-        $('#compStatus').text("Network Error! Retrying...").css('color', '#ff4b2b');
+        console.error("Network Error:", e);
+        $('#compStatus').text("Network Connection Retry...").css('color', '#ff4b2b');
         setTimeout(aiMove, 3000); 
     });
 }
@@ -405,7 +411,7 @@ function updateS() {
 }
 
 function undoMove() {
-    if(isMultiplayer) return; // Undo strictly disabled in multiplayer
+    if(isMultiplayer) return; 
 
     if(undos > 0 && game.history().length > 1) {
         game.undo(); 
@@ -420,6 +426,6 @@ function undoMove() {
 function quitGame() { 
     if(pollInterval) clearInterval(pollInterval);
     if(outgoingPollInterval) clearInterval(outgoingPollInterval);
-    isModalActive = false; // Reset popup status on quit
+    isModalActive = false; 
     showScreen('screenLanding'); 
 }
