@@ -22,6 +22,9 @@ let isMyTurn = false;
 let playerColor = 'w';
 let isModalActive = false; 
 
+// NAYA LOGIC: Server Sync Lock Flag (Bug fix ke liye)
+let isUpdatingMove = false; 
+
 // Turn Timer Variables
 let turnTimerInterval = null;
 let timeLeft = 30;
@@ -98,7 +101,7 @@ function showScreen(id) {
 }
 
 // =====================================
-// 1. REGISTRATION & LOGIN (With DB Stats Extraction)
+// 1. REGISTRATION & LOGIN
 // =====================================
 async function registerUser() {
     const user = $('#regUsername').val().trim();
@@ -133,7 +136,6 @@ async function loginUser() {
             if(d.userStatus === "NEW") {
                 showScreen('screenChangePass');
             } else { 
-                // Save complete user object for persistent login
                 let userObj = { id: id, username: d.username, wins: d.wins, losses: d.losses, total: d.total, streak: d.streak, rank: d.rank };
                 localStorage.setItem('chessUserData', JSON.stringify(userObj));
                 
@@ -201,7 +203,6 @@ async function changePassword() {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "changePassword", userId: currentId, newPassword: p1}) });
         const d = await res.json();
         if(d.status === "success") { 
-            // Save to bypass login next time
             let userObj = { id: currentId, username: currentUsername, wins: 0, losses: 0, total: 0, streak: 0, rank: "New" };
             localStorage.setItem('chessUserData', JSON.stringify(userObj));
             
@@ -313,9 +314,8 @@ function startTurnTimer() {
         
         if(timeLeft <= 0) {
             clearInterval(turnTimerInterval);
-            // I lose because of timeout
             fetch(API_URL, { method: "POST", body: JSON.stringify({action: "timeoutMatch", myId: currentId, oppId: currentOpponentId}) });
-            updateMatchResultDB(currentOpponentId, currentId); // Make opponent winner
+            updateMatchResultDB(currentOpponentId, currentId); 
             
             $('#gameOverTitle').text("Timeout!").css('color', '#ff4b2b');
             $('#gameOverMsg').text("You ran out of time. You lose.");
@@ -329,13 +329,12 @@ function stopTurnTimer() {
     $('#turnTimerBox').hide();
 }
 
-// Function to update wins/losses
 function updateMatchResultDB(winner, loser) {
     fetch(API_URL, { method: "POST", body: JSON.stringify({action: "updateMatchResult", winnerId: winner, loserId: loser}) });
 }
 
 // =====================================
-// 4. REAL-TIME MULTIPLAYER GAME (ULTRA-FAST 500MS POLLING)
+// 4. REAL-TIME MULTIPLAYER GAME 
 // =====================================
 function startMultiplayerGame(isWhite) {
     if(pollInterval) clearInterval(pollInterval);
@@ -344,6 +343,7 @@ function startMultiplayerGame(isWhite) {
     isMultiplayer = true;
     playerColor = isWhite ? 'w' : 'b';
     isMyTurn = isWhite; 
+    isUpdatingMove = false; // Reset lock flag
 
     game.reset(); 
     $('#diffTitle').text("VS REAL PLAYER");
@@ -360,7 +360,7 @@ function startMultiplayerGame(isWhite) {
         orientation: isWhite ? 'white' : 'black', 
         pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
         onDragStart: (s, p) => { 
-            if(game.game_over() || !isMyTurn || p.charAt(0) !== playerColor) return false; 
+            if(game.game_over() || !isMyTurn || p.charAt(0) !== playerColor || isUpdatingMove) return false; 
             showPaths(s); 
         },
         onDrop: (s, t) => { 
@@ -372,9 +372,11 @@ function startMultiplayerGame(isWhite) {
             isMyTurn = false; 
             $('#compStatus').text("Waiting for opponent...").css('color', '#ffb300');
             stopTurnTimer();
+            
+            // Lock active to prevent polling from overwriting our new move
+            isUpdatingMove = true; 
             updateMoveOnServer(game.fen());
 
-            // Check if my move resulted in checkmate (I win)
             if (game.in_checkmate()) {
                 updateMatchResultDB(currentId, currentOpponentId);
                 $('#gameOverTitle').text("Victory!").css('color', '#00ffaa');
@@ -399,9 +401,8 @@ function startMultiplayerGame(isWhite) {
          stopTurnTimer();
     }
 
-    // SPEED INCREASE: Decreased to 500ms (Limit of HTTP Polling for GS)
     if (gamePollInterval) clearInterval(gamePollInterval);
-    gamePollInterval = setInterval(pollOpponentMove, 1200);
+    gamePollInterval = setInterval(pollOpponentMove, 1000); // 1000ms as requested
 }
 
 async function updateMoveOnServer(fen) {
@@ -410,10 +411,21 @@ async function updateMoveOnServer(fen) {
             method: "POST", 
             body: JSON.stringify({action: "updateMove", myId: currentId, oppId: currentOpponentId, fen: fen, cacheBuster: Date.now()}) 
         });
-    } catch(e) { console.error("Move sync fail:", e); }
+        console.log("Move saved successfully.");
+        isUpdatingMove = false; // Unlock polling after successful save
+    } catch(e) { 
+        console.error("Move sync fail:", e); 
+        isUpdatingMove = false; // Unlock to prevent freezing even if error
+    }
 }
 
 async function pollOpponentMove() {
+    // IMPORTANT FIX: Stop polling if it's my turn, OR if my move is currently uploading
+    if (isMyTurn || isUpdatingMove) {
+        console.log("Polling skipped: Waiting for sync or it's my turn.");
+        return; 
+    }
+    
     try {
         const res = await fetch(API_URL, { 
             method: "POST", 
@@ -422,7 +434,6 @@ async function pollOpponentMove() {
         const d = await res.json();
         
         if (d.status === "success") {
-            // Check for Opponent Quit
             if(d.matchState.startsWith("QUIT_")) {
                 let quitter = d.matchState.split("_")[1];
                 if(quitter !== currentId) {
@@ -433,7 +444,6 @@ async function pollOpponentMove() {
                 }
                 return;
             }
-            // Check for Opponent Timeout
             if(d.matchState.startsWith("TIMEOUT_")) {
                 let loser = d.matchState.split("_")[1];
                 if(loser !== currentId) {
@@ -445,8 +455,8 @@ async function pollOpponentMove() {
                 return;
             }
 
-            // Sync Board if not my turn
-            if (!isMyTurn && d.fen && d.fen !== "") {
+            // Sync Board ONLY if we are sure it's not our turn and we aren't saving
+            if (!isMyTurn && !isUpdatingMove && d.fen && d.fen !== "") {
                 if (d.fen !== game.fen()) {
                     let valid = game.load(d.fen);
                     if (valid) {
@@ -457,37 +467,34 @@ async function pollOpponentMove() {
                         showToast("Opponent made a move!");
                         startTurnTimer(); 
 
-                        // Check if opponent's move checkmated me
                         if (game.in_checkmate()) {
                             stopTurnTimer();
                             $('#gameOverTitle').text("Defeat").css('color', '#ff4b2b');
                             $('#gameOverMsg').text("You lost by Checkmate.");
                             $('#gameOverModal').css('display', 'flex');
                         }
+                    } else {
+                        console.error("Invalid FEN string received.");
                     }
                 }
             }
         }
-    } catch(e) {}
+    } catch(e) {
+        console.error("Polling Match Error:", e);
+    }
 }
 
 function returnToLobby() {
     $('#gameOverModal').css('display', 'none');
     quitGame();
-    // Re-fetch login to update stats
     loginUserSilentUpdate();
 }
 
 async function loginUserSilentUpdate() {
-    // Silent update to refresh stats in lobby after game
     let localData = JSON.parse(localStorage.getItem('chessUserData'));
     if(!localData) return;
-    
     try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "login", userId: currentId, password: "NO_PASSWORD_REQUIRED_JUST_GET_STATS_HACK_TODO"}) });
-        // Since we don't have password stored easily, we just ask user to reload if they want fresh stats, or we wait for next relogin.
-        // Actually, user can just see their updated stats when they close browser and open again.
-        // For now, simple return to lobby is fine.
+        await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "login", userId: currentId, password: "NO_PASSWORD_REQUIRED_JUST_GET_STATS_HACK_TODO"}) });
     } catch(e) {}
     startPolling();
 }
@@ -619,7 +626,6 @@ function quitGame() {
     stopTurnTimer();
     
     if(isMultiplayer) {
-        // I lose because I quit
         fetch(API_URL, { method: "POST", body: JSON.stringify({action: "quitMatch", myId: currentId, oppId: currentOpponentId}) });
         updateMatchResultDB(currentOpponentId, currentId);
     }
