@@ -1,8 +1,7 @@
 // ==========================================
 // GLOBALS & CONFIGURATION
 // ==========================================
-// UPDATE YOUR LATEST GOOGLE APPS SCRIPT URL HERE
-const API_URL = "https://script.google.com/macros/s/AKfycbwgGUnR-9o3vFxjTQm8aFiaUf3ObHFmjtBcoAuhmVXCPLw8GM2YD0zSQR8lucT97reT/exec"; 
+const API_URL = "AAPKI_NAYI_NEW_DEPLOYMENT_WALI_API_URL_YAHAN_AAYEGI"; 
 
 let board = null;
 let game = new Chess(); 
@@ -14,15 +13,32 @@ let aiLvl = 1;
 // Multiplayer Variables
 let pollInterval = null; 
 let outgoingPollInterval = null; 
+let gamePollInterval = null; 
 let currentTargetId = "";
+let currentOpponentId = ""; 
 let isMultiplayer = false;
 let isMyTurn = false;
 let playerColor = 'w';
 let isModalActive = false; 
 
 // ==========================================
-// UI HELPER FUNCTIONS
+// IN-GAME NOTIFICATION SYSTEM 
 // ==========================================
+function showToast(msg, isError = false) {
+    let container = document.getElementById('toastContainer');
+    let toast = document.createElement('div');
+    toast.className = `toast-msg ${isError ? 'toast-error' : ''}`;
+    toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-circle' : 'fa-check-circle'}"></i> ${msg}`;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = "fadeOutToast 0.4s ease forwards";
+        setTimeout(() => toast.remove(), 400); 
+    }, 3500);
+}
+
+// UI HELPER FUNCTIONS
 function toggleVisibility(inputId, icon) {
     let input = document.getElementById(inputId);
     if (input.type === "password") { 
@@ -37,8 +53,6 @@ function toggleVisibility(inputId, icon) {
 function showScreen(id) {
     $('.screen').removeClass('active-screen');
     $('#' + id).addClass('active-screen');
-    
-    // Agar board hide hoke wapas show hua hai, toh resize karna zaroori hai mobile ke liye
     if(id === 'screenComputer' && board) {
         setTimeout(() => { board.resize(); }, 100);
         setTimeout(() => { board.resize(); }, 500);
@@ -51,26 +65,26 @@ function showScreen(id) {
 async function registerUser() {
     const user = $('#regUsername').val().trim();
     const mail = $('#regEmail').val().trim();
-    if(!user || !mail) return alert("All fields required!");
+    if(!user || !mail) return showToast("All fields required!", true); 
     
     $('#regBtn').text("Registering...").prop('disabled', true);
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "register", username: user, email: mail}) });
         const d = await res.json();
         if(d.status === "success") {
-            $('#regMsg').text("Registration Done! Check Gmail for ID & Password.").css('color', '#00ffaa');
+            showToast("Registration Done! Check Gmail."); 
             $('#regUsername, #regEmail').val("");
         } else {
-            $('#regMsg').text(d.message).css('color', '#ff4b2b'); 
+            showToast(d.message, true); 
         }
-    } catch(e) { $('#regMsg').text("Server Error!").css('color', '#ff4b2b'); }
+    } catch(e) { showToast("Server Error!", true); }
     $('#regBtn').text("Join Arena").prop('disabled', false);
 }
 
 async function loginUser() {
     const id = $('#loginId').val().trim();
     const pass = $('#loginPass').val().trim();
-    if(!id || !pass) return alert("Enter ID and Password!");
+    if(!id || !pass) return showToast("Enter ID and Password!", true);
 
     $('#loginBtn').text("Verifying...").prop('disabled', true);
     try {
@@ -84,12 +98,13 @@ async function loginUser() {
                 $('#lobbyUsername').text(d.username);
                 $('#lobbyMyId').text(id);
                 showScreen('screenLobby');
-                startPolling(); // LIVE CONNECTION STARTS HERE
+                startPolling(); 
+                showToast(`Welcome Back ${d.username}!`); 
             }
         } else {
-            $('#loginMsg').text(d.message).css('color', '#ff4b2b');
+            showToast(d.message, true);
         }
-    } catch(e) { alert("Login failed. Check connection."); }
+    } catch(e) { showToast("Login failed. Check connection.", true); }
     $('#loginBtn').text("Enter Arena").prop('disabled', false);
 }
 
@@ -98,7 +113,7 @@ async function loginUser() {
 // =====================================
 async function sendOtp() {
     const mail = $('#forgotEmail').val().trim();
-    if(!mail) return alert("Enter Email!");
+    if(!mail) return showToast("Enter Email!", true);
     $('#sendOtpBtn').text("Sending...").prop('disabled', true);
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "sendOtp", email: mail}) });
@@ -106,8 +121,9 @@ async function sendOtp() {
         if(d.status === "success") {
             currentEmail = mail;
             showScreen('screenVerifyOtp');
+            showToast("OTP Sent to Email.");
         } else {
-            $('#forgotMsg').text(d.message).css('color', '#ff4b2b');
+            showToast(d.message, true);
         }
     } catch(e) {}
     $('#sendOtpBtn').text("Send OTP").prop('disabled', false);
@@ -118,17 +134,17 @@ async function verifyAndResetPass() {
     const p1 = $('#resetPass1').val().trim();
     const p2 = $('#resetPass2').val().trim();
     
-    if(!otp || p1 !== p2 || p1.length < 4) return alert("Invalid details or Passwords mismatch!");
+    if(!otp || p1 !== p2 || p1.length < 4) return showToast("Invalid details or Passwords mismatch!", true);
     $('#resetBtn').text("Verifying...").prop('disabled', true);
     
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "verifyOtpAndReset", email: currentEmail, otp: otp, newPassword: p1}) });
         const d = await res.json();
         if(d.status === "success") {
-            alert("Password Reset Successfully! Login now.");
+            showToast("Password Reset Successfully!");
             showScreen('screenLogin');
         } else {
-            $('#resetMsg').text(d.message).css('color', '#ff4b2b');
+            showToast(d.message, true);
         }
     } catch(e) {}
     $('#resetBtn').text("Reset Password").prop('disabled', false);
@@ -136,14 +152,14 @@ async function verifyAndResetPass() {
 
 async function changePassword() {
     const p1 = $('#newPass').val().trim(), p2 = $('#confirmPass').val().trim();
-    if(p1.length < 4 || p1 !== p2) return alert("Password match nahi hua ya bohot chhota hai!");
+    if(p1.length < 4 || p1 !== p2) return showToast("Password mismatch or too short!", true);
 
     $('#changePassBtn').text("Saving...").prop('disabled', true);
     try {
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({action: "changePassword", userId: currentId, newPassword: p1}) });
         const d = await res.json();
         if(d.status === "success") { 
-            alert("Password Updated! Entering Lobby..."); 
+            showToast("Password Updated! Welcome to Lobby."); 
             $('#lobbyMyId').text(currentId);
             showScreen('screenLobby');
             startPolling();
@@ -153,13 +169,11 @@ async function changePassword() {
 }
 
 // =====================================
-// 3. FAST MULTIPLAYER MATCHMAKING
+// 3. MULTIPLAYER MATCHMAKING
 // =====================================
-
-// SENDER LOGIC
 async function sendChallenge() {
     const target = $('#targetId').val().trim();
-    if(!target || target === currentId) return alert("Valid opponent ID dalo!");
+    if(!target || target === currentId) return showToast("Enter a valid opponent ID!", true);
     
     currentTargetId = target;
     $('#challengeBtn').text("Sending...").prop('disabled', true);
@@ -180,19 +194,22 @@ async function sendChallenge() {
                     if(outD.status === "success") {
                         if(outD.matchState === "ACCEPTED") {
                             clearInterval(outgoingPollInterval);
-                            $('#lobbyMsg').text("Challenge Accepted! Starting game...").css('color', '#00ffaa');
+                            currentOpponentId = currentTargetId; 
+                            showToast("Challenge Accepted!");
+                            $('#lobbyMsg').text("Match Found! Starting...").css('color', '#00ffaa');
                             setTimeout(() => { startMultiplayerGame(false); }, 1000); 
                         } else if(outD.matchState === "REJECTED") {
                             clearInterval(outgoingPollInterval);
-                            $('#lobbyMsg').text("Challenge Rejected by Player!").css('color', '#ff4b2b');
+                            showToast("Player Rejected Challenge", true);
+                            $('#lobbyMsg').text("");
                             $('#challengeBtn').text("⚔️ Challenge Player").prop('disabled', false);
                         }
                     }
-                } catch(err) { console.log("Outgoing poll wait..."); }
+                } catch(err) { console.log("Wait..."); }
             }, 2000);
 
         } else {
-            $('#lobbyMsg').text(d.message).css('color', '#ff4b2b');
+            showToast(d.message, true);
             $('#challengeBtn').text("⚔️ Challenge Player").prop('disabled', false);
         }
     } catch(e) {
@@ -200,7 +217,6 @@ async function sendChallenge() {
     }
 }
 
-// RECEIVER LOGIC
 function startPolling() {
     if(pollInterval) clearInterval(pollInterval);
     $('#lobbyMsg').html('Connected to server <span class="pulse-dot"></span>').css('color', '#00b3ff');
@@ -213,19 +229,18 @@ function startPolling() {
             if(d.status === "success") {
                 if(d.matchState === "PENDING" && d.challenger !== "" && !isModalActive) {
                     isModalActive = true; 
+                    currentOpponentId = d.challenger; 
                     $('#challengerIdText').text(d.challenger);
                     $('#challengeModal').css('display', 'flex'); 
                 }
                 if(d.matchState === "REJECTED") {
-                    $('#lobbyMsg').text("Last challenge was rejected.").css('color', '#ff4b2b');
                     fetch(API_URL, { method: "POST", body: JSON.stringify({action: "respondChallenge", myId: currentId, response: "IDLE"}) });
                 }
             }
-        } catch(e) { console.log("Polling wait..."); }
+        } catch(e) { }
     }, 2000); 
 }
 
-// Receiver accepts or rejects
 async function respondChallenge(response) {
     $('#challengeModal').css('display', 'none'); 
     try {
@@ -234,7 +249,7 @@ async function respondChallenge(response) {
         if(response === "ACCEPTED") {
             clearInterval(pollInterval);
             isModalActive = false;
-            alert("Match Accepted! Preparing multiplayer arena...");
+            showToast("Match Accepted!");
             setTimeout(() => { startMultiplayerGame(true); }, 1000);
         } else {
             setTimeout(() => { isModalActive = false; }, 3000);
@@ -245,7 +260,7 @@ async function respondChallenge(response) {
 }
 
 // =====================================
-// 4. MULTIPLAYER GAME LOGIC
+// 4. REAL-TIME MULTIPLAYER GAME (CACHE-BUSTER ADDED)
 // =====================================
 function startMultiplayerGame(isWhite) {
     if(pollInterval) clearInterval(pollInterval);
@@ -257,7 +272,6 @@ function startMultiplayerGame(isWhite) {
 
     game.reset(); 
     $('#diffTitle').text("VS REAL PLAYER");
-    
     $('#uB').hide(); 
     $('#uC').parent().hide(); 
     
@@ -280,6 +294,9 @@ function startMultiplayerGame(isWhite) {
             updateS(); 
             isMyTurn = false; 
             $('#compStatus').text("Waiting for opponent...").css('color', '#ffb300');
+            
+            // SERVER PE MOVE BHEJNA
+            updateMoveOnServer(game.fen());
         },
         onSnapEnd: () => board.position(game.fen())
     };
@@ -289,7 +306,6 @@ function startMultiplayerGame(isWhite) {
     setTimeout(() => { if(board) board.resize(); }, 100);
     setTimeout(() => { if(board) board.resize(); }, 500);
     $(window).resize(() => { if(board) board.resize(); });
-    
     updateS();
     
     if(isWhite) {
@@ -297,14 +313,53 @@ function startMultiplayerGame(isWhite) {
     } else {
          $('#compStatus').text("Waiting for opponent...").css('color', '#ffb300');
     }
+
+    if (gamePollInterval) clearInterval(gamePollInterval);
+    gamePollInterval = setInterval(pollOpponentMove, 2000);
+}
+
+// CACHE BUSTER ADDED TO PREVENT MOBILE FREEZING
+async function updateMoveOnServer(fen) {
+    try {
+        await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({action: "updateMove", myId: currentId, oppId: currentOpponentId, fen: fen, cacheBuster: Date.now()}) 
+        });
+    } catch(e) { console.error("Move sync fail"); }
+}
+
+// OPPONENT KA MOVE CHECK KARNA
+async function pollOpponentMove() {
+    if (isMyTurn) return; 
+    try {
+        const res = await fetch(API_URL, { 
+            method: "POST", 
+            body: JSON.stringify({action: "pollGame", myId: currentId, oppId: currentOpponentId, cacheBuster: Date.now()}) 
+        });
+        const d = await res.json();
+        
+        if (d.status === "success" && d.fen && d.fen !== "") {
+            if (d.fen !== game.fen()) {
+                let valid = game.load(d.fen);
+                if (valid) {
+                    board.position(d.fen);
+                    updateS();
+                    isMyTurn = true;
+                    $('#compStatus').text("Your Turn! Make a move.").css('color', '#00ffaa');
+                    showToast("Opponent made a move!");
+                }
+            }
+        }
+    } catch(e) {}
 }
 
 // =====================================
-// 5. AI GAME LOGIC (Upgraded AI Backend)
+// 5. AI GAME LOGIC
 // =====================================
 function startAiGame(lvl) {
     if(pollInterval) clearInterval(pollInterval); 
     if(outgoingPollInterval) clearInterval(outgoingPollInterval);
+    if(gamePollInterval) clearInterval(gamePollInterval);
 
     isMultiplayer = false;
     aiLvl = lvl === 'PRO' ? 12 : (lvl === 'Expert' ? 5 : 1);
@@ -345,14 +400,9 @@ function startAiGame(lvl) {
     $(window).resize(() => { if(board) board.resize(); });
 }
 
-// ========================================================
-// UPGRADED AI FUNCTION: Ultra Stable API to fix the bug
-// ========================================================
 function aiMove() {
     $('#compStatus').text("AI Thinking...").css('color', '#ffb300');
     
-    // Naya premium free API use kar rahe hain jo secure POST use karta hai
-    // Isme FEN break hone ki (Pyada 2 kadam) dikkat hamesha ke liye khatam ho jayegi
     fetch("https://chess-api.com/v1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -361,20 +411,17 @@ function aiMove() {
     .then(r => r.json())
     .then(d => {
         if(d && d.move) {
-            let m = d.move; // Move jaise "e2e4" format me aati hai
+            let m = d.move; 
             let promo = m.length > 4 ? m[4] : 'q';
-            
             game.move({from: m.slice(0,2), to: m.slice(2,4), promotion: promo});
             board.position(game.fen()); 
             updateS();
         } else {
-            console.error("AI API Error:", d);
             $('#compStatus').text("AI Engine Retry...").css('color', '#ff4b2b');
             setTimeout(aiMove, 2500); 
         }
     })
     .catch(e => {
-        console.error("Network Error:", e);
         $('#compStatus').text("Network Connection Retry...").css('color', '#ff4b2b');
         setTimeout(aiMove, 3000); 
     });
@@ -411,7 +458,7 @@ function updateS() {
 }
 
 function undoMove() {
-    if(isMultiplayer) return; 
+    if(isMultiplayer) return showToast("Undo disabled in multiplayer!", true); 
 
     if(undos > 0 && game.history().length > 1) {
         game.undo(); 
@@ -426,6 +473,7 @@ function undoMove() {
 function quitGame() { 
     if(pollInterval) clearInterval(pollInterval);
     if(outgoingPollInterval) clearInterval(outgoingPollInterval);
+    if(gamePollInterval) clearInterval(gamePollInterval);
     isModalActive = false; 
     showScreen('screenLanding'); 
 }
