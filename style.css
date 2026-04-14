@@ -1,73 +1,95 @@
-/* --- PREVIOUS CODE PRESERVED, ANIMATIONS ADDED --- */
-* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; touch-action: manipulation; }
 
-body {
-    background: #091014; color: #fff; min-height: 100vh;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    overflow-x: hidden;
+/* FIX 2: DESKTOP SCROLL ISSUE FIXED */
+body, html {
+    background: #091014; color: #fff; 
+    height: 100vh; width: 100vw; 
+    overflow: hidden; /* Faltu scroll khatam */
+    display: flex; align-items: center; justify-content: center;
 }
 
 .bg-shape { position: absolute; filter: blur(80px); z-index: -2; border-radius: 50%; background: rgba(0, 255, 170, 0.1); width: 400px; height: 400px; }
 .shape1 { top: -10%; left: -10%; } .shape2 { bottom: -10%; right: -10%; }
 
-/* --- SMOOTH TRANSITION FIX --- */
+/* SCREEN ACTS LIKE AN APP PAGE */
 .screen { 
-    display: none; width: 100%; padding: 20px; flex-direction: column; align-items: center; 
-    opacity: 0; animation: fadeIn 0.5s ease-out forwards; 
+    display: none; width: 100%; height: 100%; padding: 30px 20px; 
+    flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; animation: fadeIn 0.4s ease-out forwards;
+    overflow-y: auto; /* Agar content zyada ho tabhi scroll hoga */
 }
 .active-screen { display: flex; }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(15px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.logo-text { font-size: 3rem; font-weight: 800; background: linear-gradient(90deg, #00ffaa, #00a2ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 30px; }
-.subtitle { color: #8fa0b3; letter-spacing: 2px; }
+.logo-text { font-size: 3rem; font-weight: 800; background: linear-gradient(90deg, #00ffaa, #00a2ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px; text-align: center; }
+.subtitle { color: #8fa0b3; letter-spacing: 2px; text-align: center; margin-bottom: 30px; }
 
 .modes-wrapper { display: flex; flex-direction: row; gap: 30px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 900px; }
-.landing-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 35px; text-align: center; flex: 1; min-width: 300px; }
+.landing-card { background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 35px; text-align: center; flex: 1; min-width: 320px; }
 
-button { padding: 14px; border-radius: 12px; border: none; font-weight: 600; cursor: pointer; width: 100%; transition: 0.3s; margin-top: 10px; }
-.main-btn { background: #00ffaa; color: #000; } .main-btn:hover { background: #00d18b; }
+button { padding: 16px; border-radius: 12px; border: none; font-weight: bold; font-size: 1.1rem; cursor: pointer; width: 100%; transition: 0.3s; margin-top: 10px; }
+.main-btn { background: #00ffaa; color: #000; } .main-btn:hover { background: #00d18b; box-shadow: 0 5px 15px rgba(0,255,170,0.3); }
 .sec-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
 .pro-btn { background: linear-gradient(90deg, #ff416c, #ff4b2b); color: #fff; }
 
-.auth-input { width: 100%; padding: 14px; margin-top: 15px; border-radius: 10px; border: 1px solid #333; background: #111; color: #fff; outline: none; transition: 0.3s; }
+.auth-input { width: 100%; padding: 16px; margin-top: 15px; border-radius: 12px; border: 1px solid #333; background: #111; color: #fff; font-size: 1rem; outline: none; transition: 0.3s; }
 .auth-input:focus { border-color: #00ffaa; box-shadow: 0 0 10px rgba(0,255,170,0.2); }
-.msg-text { margin-top: 15px; font-size: 14px; }
+.msg-text { margin-top: 15px; font-size: 14px; font-weight: 600; }
 
 .password-container { position: relative; width: 100%; }
-.auth-pass { padding-right: 45px; } 
-.toggle-eye { position: absolute; right: 15px; top: 32px; color: #8fa0b3; cursor: pointer; font-size: 18px; transition: 0.3s; }
-.toggle-eye:hover { color: #00ffaa; }
+.auth-pass { padding-right: 50px; } 
+.toggle-eye { position: absolute; right: 15px; top: 34px; color: #8fa0b3; cursor: pointer; font-size: 20px; transition: 0.3s; padding: 5px; }
 
+/* GAME AREA */
 .comp-header { display: flex; justify-content: space-between; width: 100%; max-width: 850px; align-items: center; margin-bottom: 20px; background: rgba(0,0,0,0.4); padding: 15px 20px; border-radius: 15px; border: 1px solid rgba(0,255,170,0.2); }
-.back-btn { width: auto; padding: 8px 15px; background: transparent; border: 1px solid #fff; color: #fff; margin-top: 0; }
+.back-btn { width: auto; padding: 10px 20px; background: transparent; border: 1px solid #fff; color: #fff; margin-top: 0; font-size: 1rem; }
 
 .game-main { display: flex; gap: 25px; width: 100%; max-width: 850px; justify-content: center; align-items: flex-start; }
-.board-wrapper { flex: 1; max-width: 500px; background: #111; padding: 15px; border-radius: 15px; border: 1px solid #00ffaa44; }
+.board-wrapper { flex: 1; max-width: 500px; background: #111; padding: 15px; border-radius: 15px; border: 1px solid rgba(0,255,170,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .game-sidebar { width: 300px; background: rgba(255,255,255,0.05); padding: 25px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); }
 
 .sidebar-section { margin-bottom: 20px; }
-.status-highlight { color: #00ffaa; font-weight: bold; font-size: 1.2rem; margin-top: 5px; }
+.status-highlight { color: #00ffaa; font-weight: bold; font-size: 1.3rem; margin-top: 5px; }
 .score-box { display: flex; justify-content: space-between; margin-top: 10px; }
 .p-info { text-align: center; opacity: 0.4; flex: 1; }
 .active-p { opacity: 1; color: #00ffaa; }
-.p-info b { display: block; font-size: 1.5rem; }
+.p-info b { display: block; font-size: 1.8rem; }
 
 .highlight-white { background-color: rgba(0, 255, 170, 0.4) !important; }
 .highlight-black { background-color: rgba(0, 255, 170, 0.6) !important; }
 
-/* MODAL / NOTIFICATION POPUP CSS */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
-.modal-box { background: #111; padding: 30px; border-radius: 15px; border: 1px solid #00ffaa; text-align: center; width: 300px; animation: fadeIn 0.3s; }
-.modal-btns { display: flex; gap: 10px; margin-top: 20px; }
-.accept-btn { background: #00ffaa; color: #000; flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
-.reject-btn { background: #ff4b2b; color: #fff; flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
+/* LIVE POLLING ANIMATION */
+.pulse-dot { display: inline-block; width: 10px; height: 10px; background: #00ffaa; border-radius: 50%; margin-left: 10px; animation: pulse 1s infinite alternate; }
+@keyframes pulse { from { opacity: 0.3; transform: scale(0.8); } to { opacity: 1; transform: scale(1.2); box-shadow: 0 0 10px #00ffaa; } }
 
+/* MODAL / NOTIFICATION POPUP */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
+.modal-box { background: #111; padding: 40px 30px; border-radius: 20px; border: 2px solid #00ffaa; text-align: center; width: 90%; max-width: 350px; animation: fadeIn 0.3s; box-shadow: 0 15px 40px rgba(0,255,170,0.2); }
+.modal-btns { display: flex; gap: 15px; margin-top: 25px; }
+.accept-btn { background: #00ffaa; color: #000; flex: 1; padding: 15px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+.reject-btn { background: #ff4b2b; color: #fff; flex: 1; padding: 15px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; font-size: 1.1rem; }
+
+/* FIX 1: NATIVE APP FEEL FOR MOBILE */
 @media (max-width: 800px) {
-    .modes-wrapper { flex-direction: column; align-items: center; }
-    .game-main { flex-direction: column; align-items: center; }
-    .game-sidebar { width: 100%; max-width: 500px; }
+    .screen { justify-content: flex-start; padding: 20px 15px; }
+    .logo-text { font-size: 2.2rem; }
+    .modes-wrapper { flex-direction: column; width: 100%; gap: 15px; }
+    .landing-card { width: 100%; padding: 25px 20px; min-width: unset; }
+    
+    .game-main { flex-direction: column; align-items: center; padding-bottom: 30px; }
+    .board-wrapper { width: 100%; padding: 10px; }
+    
+    .comp-header { flex-direction: row; font-size: 0.9rem; padding: 10px 15px; }
+    .back-btn { padding: 8px 12px; font-size: 0.9rem; }
+    
+    /* Sidebar converted to Bottom Native Stats Bar */
+    .game-sidebar { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 15px; margin-top: 5px; }
+    .sidebar-section { margin-bottom: 0; }
+    .undo-section { grid-column: span 2; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;}
+    .undo-section p { margin: 0; font-size: 1.1rem; }
+    #uB { width: auto; margin-top: 0; padding: 10px 20px; }
 }
