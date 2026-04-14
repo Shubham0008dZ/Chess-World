@@ -401,7 +401,7 @@ function startMultiplayerGame(isWhite) {
 
     // SPEED INCREASE: Decreased to 500ms (Limit of HTTP Polling for GS)
     if (gamePollInterval) clearInterval(gamePollInterval);
-    gamePollInterval = setInterval(pollOpponentMove, 500);
+    gamePollInterval = setInterval(pollOpponentMove, 1200);
 }
 
 async function updateMoveOnServer(fen) {
